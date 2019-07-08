@@ -8,9 +8,13 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@types/lodash": "^4.14.136",
+    "knex": "^0.18.3",
+    "lodash": "^4.17.11",
     "react": "16.8.6",
     "react-native": "0.60.0",
-    "react-native-sqlite-storage": "^3.3.10"
+    "react-native-sqlite-storage": "^3.3.10",
+    "sqlite3": "^4.0.9"
   },
   "devDependencies": {
     "@babel/core": "^7.5.0",
