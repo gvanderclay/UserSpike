@@ -32,7 +32,7 @@ type User = {
 
 const App = () => {
   const [title, setTitle] = useState("waiting");
-  const [data, setData] = useState<string[]>([]);
+  const [data, setData] = useState<User[]>([]);
   useEffect(() => {
     console.log("useEffect");
     SQLite.DEBUG(true);
@@ -47,9 +47,9 @@ const App = () => {
           createTables(db).then(() => {
             seedFacets(db).then(() => {
               getUserData().then(result => {
-                const userNames = result[0];
+                const users = result[0];
                 const facets = result[1];
-                insertUsers(db, userNames).then(() => {
+                insertUsers(db, users).then(() => {
                   getFacetIds(db).then(facetIds => {
                     const data: { [key: string]: [string[], string] } = {
                       gender: [facets["gender"], facetIds["gender"]],
@@ -89,7 +89,11 @@ const App = () => {
         <ScrollView contentInsetAdjustmentBehavior="automatic">
           <Text>{title}</Text>
           {data.map(user => (
-            <Text>{user}</Text>
+            <View>
+              <Text>{user.name}</Text>
+              <Text>{user.gender}</Text>
+              <Text>{user.nat}</Text>
+            </View>
           ))}
         </ScrollView>
       </SafeAreaView>
@@ -155,15 +159,11 @@ function seedFacets(db: SQLite.SQLiteDatabase): Promise<SQLite.Transaction> {
   });
 }
 
-function getUserData(): Promise<[string[], { [key: string]: string[] }]> {
+function getUserData(): Promise<[User[], { [key: string]: string[] }]> {
   return new Promise((res, rej) => {
     fetch("https://randomuser.me/api/?results=50").then(response => {
       response.json().then(data => {
         console.log(data);
-
-        const parsedNames: string[] = data.results.map(
-          (user: User) => user.name.first
-        );
 
         const parsedGenders: string[] = _.uniq(
           data.results.map((user: User) => user.gender)
@@ -173,7 +173,7 @@ function getUserData(): Promise<[string[], { [key: string]: string[] }]> {
           data.results.map((user: User) => user.nat)
         );
 
-        res([parsedNames, { gender: parsedGenders, nat: parsedNationalities }]);
+        res([data.results as User[], { gender: parsedGenders, nat: parsedNationalities }]);
       });
     });
   });
@@ -223,15 +223,30 @@ function insertFacetValues(
   });
 }
 
-function insertUsers(db: SQLite.SQLiteDatabase, parsedNames: string[]) {
+function insertUsers(db: SQLite.SQLiteDatabase, users: User[]) {
   return db.transaction(transaction => {
-    transaction.executeSql(
-      `
-        INSERT into USERS (name)
-        VALUES(?);
-      `,
-      [parsedNames]
-    );
+    _.forEach(users, user => {
+      transaction.executeSql(
+        `
+          INSERT into Users (name)
+          VALUES(?);
+        `,
+        [user.name]
+      );
+    });
+  }).then(() => {
+    db.transaction(transaction => {
+      _.forEach(users, user => {
+        transaction.executeSql(
+          `
+            INSERT INTO UserFacets(user_id, facet_value_id)
+            VALUES (?, fId)
+            SELECT facet_value_id FROM FacetValues fv
+            JOIN Facets f ON fv.facet_id = f.facet_id;
+          `
+        );
+      });
+    });
   });
 }
 
