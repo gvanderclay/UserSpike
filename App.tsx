@@ -42,36 +42,43 @@ const App = () => {
       name: "TestDatabase",
       location: "default"
     }).then(db => {
-      dropTables(db).then(() => {
-        createTables(db).then(() => {
-          seedFacets(db).then(() => {
-            getUserData().then((result) => {
-              const userNames = result[0];
-              const facets = result[1];
-              insertUsers(db, userNames).then(() => {
-                getFacetIds(db).then((facetIds) => {
-                  const data : {[key: string] : [string[], string]} = {'gender' : [facets['gender'], facetIds['gender']], 'nat' : [facets['nat'], facetIds['nat']]};
-                  insertFacetValues(db, data).then(() => {
-                    db.executeSql(
-                      `
+      dropTables(db)
+        .then(() => {
+          createTables(db).then(() => {
+            seedFacets(db).then(() => {
+              getUserData().then(result => {
+                const userNames = result[0];
+                const facets = result[1];
+                insertUsers(db, userNames).then(() => {
+                  getFacetIds(db).then(facetIds => {
+                    const data: { [key: string]: [string[], string] } = {
+                      gender: [facets["gender"], facetIds["gender"]],
+                      nat: [facets["nat"], facetIds["nat"]]
+                    };
+                    insertFacetValues(db, data).then(() => {
+                      db.executeSql(
+                        `
                         SELECT * FROM FacetValues;
                       `
-                    ).then(([result]) => {
-                      const items : string[] = _.map(_.range(result.rows.length), x => result.rows.item(x).facet_value);
-                      console.log(items);
-                      setData(items);
-                    })
+                      ).then(([result]) => {
+                        const items: string[] = _.map(
+                          _.range(result.rows.length),
+                          x => result.rows.item(x).facet_value
+                        );
+                        console.log(items);
+                        setData(items);
+                      });
+                    });
                   });
                 });
               });
-            })
-          })
-        });
-      })
-      .then(() => {
-        setTitle("Done");
-      })
-      .catch(e => setTitle(e));
+            });
+          });
+        })
+        .then(() => {
+          setTitle("Done");
+        })
+        .catch(e => setTitle(e));
     });
   }, []);
 
@@ -90,7 +97,7 @@ const App = () => {
   );
 };
 
-function dropTables(db : SQLite.SQLiteDatabase) : Promise<SQLite.Transaction> {
+function dropTables(db: SQLite.SQLiteDatabase): Promise<SQLite.Transaction> {
   return db.transaction(transaction => {
     transaction.executeSql("DROP TABLE IF EXISTS Users;");
     transaction.executeSql("DROP TABLE IF EXISTS Facets;");
@@ -99,7 +106,7 @@ function dropTables(db : SQLite.SQLiteDatabase) : Promise<SQLite.Transaction> {
   });
 }
 
-function createTables(db : SQLite.SQLiteDatabase) : Promise<SQLite.Transaction> {
+function createTables(db: SQLite.SQLiteDatabase): Promise<SQLite.Transaction> {
   return db.transaction(transaction => {
     transaction.executeSql(`
             CREATE TABLE Users(
@@ -134,7 +141,7 @@ function createTables(db : SQLite.SQLiteDatabase) : Promise<SQLite.Transaction> 
   });
 }
 
-function seedFacets(db : SQLite.SQLiteDatabase) : Promise<SQLite.Transaction> {
+function seedFacets(db: SQLite.SQLiteDatabase): Promise<SQLite.Transaction> {
   return db.transaction(transaction => {
     transaction.executeSql(`
       INSERT into Facets (name)
@@ -148,66 +155,75 @@ function seedFacets(db : SQLite.SQLiteDatabase) : Promise<SQLite.Transaction> {
   });
 }
 
-function getUserData() : Promise<[string[], {[key: string] : string[]}]> {
+function getUserData(): Promise<[string[], { [key: string]: string[] }]> {
   return new Promise((res, rej) => {
     fetch("https://randomuser.me/api/?results=50").then(response => {
       response.json().then(data => {
         console.log(data);
-  
-        const parsedNames : string[] = data.results.map(
+
+        const parsedNames: string[] = data.results.map(
           (user: User) => user.name.first
         );
-        
-        const parsedGenders : string[] = _.uniq(
+
+        const parsedGenders: string[] = _.uniq(
           data.results.map((user: User) => user.gender)
         );
-        
-        const parsedNationalities : string[] = _.uniq(
+
+        const parsedNationalities: string[] = _.uniq(
           data.results.map((user: User) => user.nat)
         );
 
-        res([parsedNames, {'gender' : parsedGenders, 'nat' : parsedNationalities}]);
+        res([parsedNames, { gender: parsedGenders, nat: parsedNationalities }]);
       });
     });
-  })
-  
+  });
 }
 
-function getFacetIds(db : SQLite.SQLiteDatabase) : Promise<{[key: string] : string}> {
+function getFacetIds(
+  db: SQLite.SQLiteDatabase
+): Promise<{ [key: string]: string }> {
   return new Promise((res, rej) => {
     db.transaction(transaction => {
-      transaction.executeSql(
-        `SELECT * from Facets;`
-      )
-      .then(([tx, result]) => {
-        const items = _.map(_.range(result.rows.length), x => result.rows.item(x));
-        const genderId = _.find(items, item => item.name === 'gender');
-        const natId = _.find(items, item => item.name === 'nat');
-        res({genderId, natId});
+      transaction.executeSql(`SELECT * from Facets;`).then(([tx, result]) => {
+        const items = _.map(_.range(result.rows.length), x =>
+          result.rows.item(x)
+        );
+        const genderId = _.find(items, item => item.name === "gender");
+        const natId = _.find(items, item => item.name === "nat");
+        res({ genderId, natId });
       });
     });
   });
- }
+}
 
-function insertFacetValues(db : SQLite.SQLiteDatabase, facetValues : {[key: string] : [string[], string]}) : Promise<SQLite.Transaction> {
+function insertFacetValues(
+  db: SQLite.SQLiteDatabase,
+  facetValues: { [key: string]: [string[], string] }
+): Promise<SQLite.Transaction> {
   return db.transaction(transaction => {
-    transaction.executeSql(
-      `
-        INSERT into FacetValues (facet_id, facet_value)
-        VALUES(?, ?);
-      `, [facetValues['gender'][1], facetValues['gender'][0]]
-    )
+    _.forEach(facetValues["gender"][0], value => {
+      transaction.executeSql(
+        `
+          INSERT into FacetValues (facet_id, facet_value)
+          VALUES(?, ?);
+        `,
+        [facetValues["gender"][1], value]
+      );
+    });
 
-    transaction.executeSql(
-      `
-        INSERT into FacetValues (facet_id, facet_value)
-        VALUES(?, ?);
-      `, [facetValues['nat'][1], facetValues['nat'][0]]
-    )
+    _.forEach(facetValues["nat"][0], value => {
+      transaction.executeSql(
+        `
+          INSERT into FacetValues (facet_id, facet_value)
+          VALUES(?, ?);
+        `,
+        [facetValues["nat"][1], value]
+      );
+    });
   });
 }
 
-function insertUsers(db : SQLite.SQLiteDatabase, parsedNames : string[]) {
+function insertUsers(db: SQLite.SQLiteDatabase, parsedNames: string[]) {
   return db.transaction(transaction => {
     transaction.executeSql(
       `
@@ -215,7 +231,7 @@ function insertUsers(db : SQLite.SQLiteDatabase, parsedNames : string[]) {
         VALUES(?);
       `,
       [parsedNames]
-    )
+    );
   });
 }
 
