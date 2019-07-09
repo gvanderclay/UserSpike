@@ -13,6 +13,7 @@
     "lodash": "^4.17.11",
     "react": "16.8.6",
     "react-native": "0.60.0",
+    "react-native-cli": "^2.0.1",
     "react-native-sqlite-storage": "^3.3.10",
     "sqlite3": "^4.0.9"
   },
