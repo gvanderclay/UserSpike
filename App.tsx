@@ -20,6 +20,7 @@ import {
 
 import * as _ from "lodash";
 import SQLite from "react-native-sqlite-storage";
+import uuid from "react-native-uuid";
 
 type User = {
   gender: string;
@@ -28,11 +29,20 @@ type User = {
     last: string;
   };
   nat: string;
+  id: {
+    value: string;
+  };
+};
+
+type Facet = {
+  name: string;
+  values: string[];
 };
 
 const App = () => {
   const [title, setTitle] = useState("waiting");
   const [data, setData] = useState<User[]>([]);
+  const [facets, setFacets] = useState<Facet[]>([]);
   useEffect(() => {
     async function foo() {
       try {
@@ -50,14 +60,28 @@ const App = () => {
       <SafeAreaView>
         <ScrollView contentInsetAdjustmentBehavior="automatic">
           <Text>{title}</Text>
-          {data.map((data, index) => (
-            <Text key={index}>{JSON.stringify(data)}</Text>
-          ))}
+          {data.map((data, index) => [
+            <Text key={index}>{JSON.stringify(data)}</Text>,
+            <Text>_____________________________________</Text>
+          ])}
         </ScrollView>
       </SafeAreaView>
     </Fragment>
   );
 };
+
+const FacetFilter = (facet: Facet) => {
+  return (
+    <View>
+      <Text>{facet.name}</Text>
+      {_.map(facet.values, value => (
+        <Text>{value}</Text>
+      ))}
+    </View>
+  );
+};
+
+function getFacets() {}
 
 function dropTables(db: SQLite.SQLiteDatabase): Promise<SQLite.Transaction> {
   return db.transaction(transaction => {
@@ -71,11 +95,12 @@ function dropTables(db: SQLite.SQLiteDatabase): Promise<SQLite.Transaction> {
 function createTables(db: SQLite.SQLiteDatabase): Promise<SQLite.Transaction> {
   return db.transaction(transaction => {
     transaction.executeSql(`
-            CREATE TABLE Users(
-              user_id INTEGER PRIMARY KEY NOT NULL,
-              name TEXT
-            );
-          `);
+      CREATE TABLE Users(
+        id INTEGER PRIMARY KEY NOT NULL,
+        name TEXT,
+        user_id TEXT NOT NULL UNIQUE
+      );
+    `);
 
     transaction.executeSql(`
       CREATE TABLE Facets(
@@ -130,10 +155,14 @@ function getUserData(): Promise<[User[], { [key: string]: string[] }]> {
           data.results.map((user: User) => user.nat)
         );
 
-        res([
-          data.results as User[],
-          { gender: parsedGenders, nat: parsedNationalities }
-        ]);
+        const parsedUsers: User[] = _.map(data.results, (user: User) => ({
+          ...user,
+          id: {
+            value: uuid.v1()
+          }
+        }));
+
+        res([parsedUsers, { gender: parsedGenders, nat: parsedNationalities }]);
       });
     });
   });
@@ -147,10 +176,10 @@ function insertFacetValues(
     _.forEach(facetValues["gender"], value => {
       transaction.executeSql(
         `
-          INSERT into FacetValues (facet_id, facet_value)
-          SELECT facet_id, ?
-          FROM Facets as f where f.name = 'gender';
-        `,
+            INSERT into FacetValues (facet_id, facet_value)
+            SELECT facet_id, ?
+            FROM Facets as f where f.name = 'gender';
+          `,
         [value]
       );
     });
@@ -174,26 +203,40 @@ async function insertUsers(
 ): Promise<void> {
   await db.transaction(transaction => {
     _.forEach(users, user => {
+      if (!user.id.value) {
+        console.log("HELLLO", user);
+      }
       transaction.executeSql(
         `
-          INSERT into Users (name)
-          VALUES(?);
+          INSERT into Users (name, user_id)
+          VALUES(?, ?);
         `,
-        [user.name.first],
-        (x, y) => console.log(y.rows)
+        [user.name.first, user.id.value]
       );
     });
   });
   await db.transaction(transaction => {
     _.forEach(users, user => {
-      // transaction.executeSql(
-      //   `
-      //       INSERT INTO UserFacets(user_id, facet_value_id)
-      //       SELECT facet_value_id, user_id
-      //       FROM FacetValues fv
-      //       JOIN Facets f ON fv.facet_id = f.facet_id;
-      //     `
-      // );
+      transaction.executeSql(
+        `
+            INSERT into UserFacets (user_id, facet_value_id)
+            SELECT ?, fv.facet_value_id
+            FROM FacetValues fv
+            JOIN Facets f ON fv.facet_id = f.facet_id
+            WHERE f.name = 'gender' and fv.facet_value = ?;,
+        `,
+        [user.id.value, user.gender]
+      );
+      transaction.executeSql(
+        `
+            INSERT into UserFacets (user_id, facet_value_id)
+            SELECT ?, fv.facet_value_id
+            FROM FacetValues fv
+            JOIN Facets f ON fv.facet_id = f.facet_id
+            WHERE f.name = 'nat' and fv.facet_value = ?;,
+        `,
+        [user.id.value, user.nat]
+      );
     });
   });
 }
@@ -208,17 +251,23 @@ const handleUpdates = async (cb: any) => {
     await createTables(db);
     await seedFacets(db);
     const [users, facets] = await getUserData();
-    await insertUsers(db, users);
     await insertFacetValues(db, facets);
+    await insertUsers(db, users);
     try {
       db.transaction(async tx => {
         tx.executeSql(
-          `SELECT * FROM Users;`,
+          `
+            SELECT *
+            FROM Users u
+            JOIN UserFacets uf on u.user_id = uf.user_id
+            JOIN FacetValues fv on uf.facet_value_id = fv.facet_value_id
+           `,
           undefined,
           (tx, queryResult) => {
             const items: string[] = _.map(_.range(queryResult.rows.length), x =>
               queryResult.rows.item(x)
             );
+            console.log(queryResult.rows.length);
             cb(items);
           },
           (tx, error) => {
