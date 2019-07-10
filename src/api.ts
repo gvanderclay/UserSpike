@@ -22,7 +22,7 @@ export function getUserData(): Promise<GetUserDataResult> {
 
         const users: User[] = _.map(data.results, (user: User) => ({
           ...user,
-          id: uuid.v1()
+          id: uuid.v4()
         }));
 
         res({ users, genders, nationalities });
