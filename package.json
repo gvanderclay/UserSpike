@@ -16,8 +16,10 @@
     "react": "16.8.6",
     "react-native": "0.60.0",
     "react-native-cli": "^2.0.1",
+    "react-native-multiple-select": "^0.5.2",
     "react-native-sqlite-storage": "^3.3.10",
     "react-native-uuid": "^1.4.9",
+    "react-native-vector-icons": "^6.6.0",
     "sqlite3": "^4.0.9"
   },
   "devDependencies": {

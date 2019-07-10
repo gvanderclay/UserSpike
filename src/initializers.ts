@@ -8,8 +8,11 @@ import {
   queryForUsers
 } from "./db";
 import { getUserData } from "./api";
-import { User } from "./types";
-import { userQueryResultToDomain } from "./domain-converters";
+import { User, Facet } from "./types";
+import {
+  userQueryResultToDomain as userQueryResultToUsers,
+  userQueryResultToFacets
+} from "./domain-converters";
 
 export const initializeData = async () => {
   const db = await initDatabase();
@@ -21,8 +24,15 @@ export const initializeData = async () => {
   await insertUsers(db, users);
 };
 
-export const getUserInformation = async (): Promise<User[]> => {
+type AppInfo = {
+  users: User[];
+  facets: Facet[];
+};
+
+export const getInformation = async (): Promise<AppInfo> => {
   const db = await initDatabase();
   const queriedUsers = await queryForUsers(db);
-  return userQueryResultToDomain(queriedUsers);
+  const users = userQueryResultToUsers(queriedUsers);
+  const facets = userQueryResultToFacets(queriedUsers);
+  return { users, facets };
 };

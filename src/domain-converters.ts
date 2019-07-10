@@ -1,5 +1,5 @@
 import _ from "lodash";
-import { User } from "./types";
+import { User, Facet } from "./types";
 import { UserQueryResult } from "./db";
 
 export const userQueryResultToDomain = (
@@ -28,5 +28,23 @@ export const userQueryResultToDomain = (
         }
       }
     )
+  );
+};
+
+export const userQueryResultToFacets = (
+  queryResult: UserQueryResult[]
+): Facet[] => {
+  const groupedQueryResults = _.groupBy(queryResult, "facetName");
+  return _.map(
+    groupedQueryResults,
+    (queryResults, key): Facet => {
+      return {
+        name: key,
+        values: _.chain(queryResults)
+          .map(result => result.facetValue)
+          .uniq()
+          .value()
+      };
+    }
   );
 };
