@@ -271,19 +271,15 @@ export const queryForFacetNumbersWithUserIds = async (
           FROM UserFacets uf
           JOIN Users u on uf.user_id = u.user_id
           JOIN FacetValues fv on uf.facet_value_id = fv.facet_value_id
-          AND uf.facet_value_id in (${facetValueIds.map(v => "?").join(",")})
-          AND uf.user_id in (${userIds.map(v => "?").join(",")})
+          AND uf.facet_value_id in (${facetValueIds.map(v => `${v}`).join(",")})
+          AND uf.user_id in (${userIds.map(v => `'${v}'`).join(",")})
         `;
-      tx.executeSql(
-        query,
-        _.concat<string | number>(facetValueIds, userIds),
-        (trx, result) => {
-          const items = _.map(_.range(result.rows.length), i =>
-            result.rows.item(i)
-          );
-          res(items[0].facetValueCount || 0);
-        }
-      );
+      tx.executeSql(query, undefined, (trx, result) => {
+        const items = _.map(_.range(result.rows.length), i =>
+          result.rows.item(i)
+        );
+        res(items[0].facetValueCount || 0);
+      });
     });
   });
 };

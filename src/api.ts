@@ -10,23 +10,26 @@ type GetUserDataResult = {
 
 export function getUserData(): Promise<GetUserDataResult> {
   return new Promise((res, rej) => {
-    fetch("https://randomuser.me/api/?results=50").then(response => {
-      response.json().then(data => {
-        const genders: string[] = _.uniq(
-          data.results.map((user: User) => user.gender)
-        );
+    fetch("https://randomuser.me/api/?results=500").then(response => {
+      response
+        .json()
+        .then(data => {
+          const genders: string[] = _.uniq(
+            data.results.map((user: User) => user.gender)
+          );
 
-        const nationalities: string[] = _.uniq(
-          data.results.map((user: User) => user.nat)
-        );
+          const nationalities: string[] = _.uniq(
+            data.results.map((user: User) => user.nat)
+          );
 
-        const users: User[] = _.map(data.results, (user: User) => ({
-          ...user,
-          id: uuid.v4()
-        }));
+          const users: User[] = _.map(data.results, (user: User) => ({
+            ...user,
+            id: uuid.v4()
+          }));
 
-        res({ users, genders, nationalities });
-      });
+          res({ users, genders, nationalities });
+        })
+        .catch(rej);
     });
   });
 }
