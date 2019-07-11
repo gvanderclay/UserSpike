@@ -117,8 +117,7 @@ const FacetFilter = (props: {
           <TouchableOpacity onPress={() => props.onFacetPressed(value.id)}>
             <Text style={{ color: valueColor(value.id) }}>{value.name}</Text>
           </TouchableOpacity>
-          <Text> ID {value.id} : </Text>
-          <Text> COUNT {value.count}</Text>
+          <Text> {value.count}</Text>
         </View>
       ))}
     </View>

@@ -7,7 +7,8 @@ import {
   insertUsers,
   queryForUsers,
   queryForFacetNumbers,
-  queryForUsersWithFacets
+  queryForUsersWithFacets,
+  queryForFacetNumbersWithUserIds
 } from "./db";
 import { getUserData } from "./api";
 import { User, Facet, FacetWithFacetValueCount, FacetValue } from "./types";
@@ -51,7 +52,11 @@ export const getInformation = async (
             return {
               id: value.id,
               name: value.name,
-              count: await queryForFacetNumbers(db, [value.id])
+              count: await queryForFacetNumbersWithUserIds(
+                db,
+                [value.id],
+                _.map(users, user => user.id)
+              )
             };
           })
         )
