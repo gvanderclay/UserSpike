@@ -5,32 +5,44 @@ import {
   ScrollView,
   View,
   Text,
-  StatusBar
+  StatusBar,
+  TouchableOpacity
 } from "react-native";
 
 import * as _ from "lodash";
-import uuid from "react-native-uuid";
-import { User, Facet } from "./types";
+import { User, Facet, FacetWithFacetValueCount } from "./types";
 import { initializeData, getInformation } from "./initializers";
 
 const App = () => {
   const [title, setTitle] = useState("waiting");
   const [users, setUsers] = useState<User[]>([]);
-  const [facets, setFacets] = useState<Facet[]>([]);
+  const [facets, setFacets] = useState<FacetWithFacetValueCount[]>([]);
+  const [didInit, setDidInit] = useState(false);
+  const [selectedFacetValues, setSelectedFacetValues] = useState<number[]>([]);
   useEffect(() => {
-    async function foo() {
+    async function getData(selectedFacetValues: number[]) {
       try {
-        await initializeData();
-        const { users, facets } = await getInformation();
+        if (!didInit) await initializeData();
+        const { users, facets } = await getInformation(selectedFacetValues);
         setTitle("Done");
         setUsers(users);
         setFacets(facets);
+        setDidInit(true);
       } catch (e) {
         setTitle(`Error initializing:\n${JSON.stringify(e, null, 2)}`);
       }
     }
-    foo();
-  }, []);
+    getData(selectedFacetValues);
+  }, [selectedFacetValues]);
+  const onFacetPressed = (selectedId: number) => {
+    if (_.find(selectedFacetValues, id => id === selectedId)) {
+      setSelectedFacetValues(
+        _.filter(selectedFacetValues, id => id !== selectedId)
+      );
+    } else {
+      setSelectedFacetValues(_.concat(selectedFacetValues, selectedId));
+    }
+  };
   return (
     <Fragment>
       <StatusBar barStyle="dark-content" />
@@ -38,15 +50,21 @@ const App = () => {
         <ScrollView contentInsetAdjustmentBehavior="automatic">
           <Text>{title}</Text>
           <View>
-            <FacetFilters facets={facets} />
+            <FacetFilters
+              selectedFacetValues={selectedFacetValues}
+              facets={facets}
+              onFacetPressed={onFacetPressed}
+            />
             {users.map((user, index) => (
               <View
+                key={index}
                 style={{
                   flexDirection: "row",
-                  justifyContent: "space-around"
+                  justifyContent: "space-around",
+                  alignItems: "flex-start"
                 }}
               >
-                <Text>{user.name.first + " " + user.name.last}</Text>
+                <Text>{user.name.first}</Text>
                 <Text>{user.gender}</Text>
                 <Text>{user.nat}</Text>
               </View>
@@ -58,7 +76,11 @@ const App = () => {
   );
 };
 
-const FacetFilters = (props: { facets: Facet[] }) => {
+const FacetFilters = (props: {
+  facets: FacetWithFacetValueCount[];
+  selectedFacetValues: number[];
+  onFacetPressed: (facetId: number) => void;
+}) => {
   return (
     <View
       style={{
@@ -66,20 +88,38 @@ const FacetFilters = (props: { facets: Facet[] }) => {
         flexDirection: "row"
       }}
     >
-      {_.map(props.facets, facet => (
-        <FacetFilter facet={facet} />
+      {_.map(props.facets, (facet, index) => (
+        <FacetFilter
+          facet={facet}
+          key={index}
+          selectedFacetValues={props.selectedFacetValues}
+          onFacetPressed={props.onFacetPressed}
+        />
       ))}
     </View>
   );
 };
 
-const FacetFilter = (props: { facet: Facet }): JSX.Element => {
-  console.warn("ERHER");
+const FacetFilter = (props: {
+  facet: FacetWithFacetValueCount;
+  selectedFacetValues: number[];
+  key: number;
+  onFacetPressed: (id: number) => void;
+}): JSX.Element => {
+  const valueColor = (id: number): "grey" | "black" => {
+    return _.includes(props.selectedFacetValues, id) ? "grey" : "black";
+  };
   return (
     <View>
       <Text>{props.facet.name}</Text>
-      {_.map(props.facet.values, value => (
-        <Text>{value}</Text>
+      {_.map(props.facet.values, (value, index) => (
+        <View style={{ flexDirection: "row" }}>
+          <TouchableOpacity onPress={() => props.onFacetPressed(value.id)}>
+            <Text style={{ color: valueColor(value.id) }}>{value.name}</Text>
+          </TouchableOpacity>
+          <Text> ID {value.id} : </Text>
+          <Text> COUNT {value.count}</Text>
+        </View>
       ))}
     </View>
   );

@@ -5,14 +5,17 @@ import {
   seedFacets,
   insertFacetValues,
   insertUsers,
-  queryForUsers
+  queryForUsers,
+  queryForFacetNumbers,
+  queryForUsersWithFacets
 } from "./db";
 import { getUserData } from "./api";
-import { User, Facet } from "./types";
+import { User, Facet, FacetWithFacetValueCount, FacetValue } from "./types";
 import {
   userQueryResultToDomain as userQueryResultToUsers,
   userQueryResultToFacets
 } from "./domain-converters";
+import _ from "lodash";
 
 export const initializeData = async () => {
   const db = await initDatabase();
@@ -26,13 +29,34 @@ export const initializeData = async () => {
 
 type AppInfo = {
   users: User[];
-  facets: Facet[];
+  facets: FacetWithFacetValueCount[];
 };
 
-export const getInformation = async (): Promise<AppInfo> => {
+export const getInformation = async (
+  selectedFacetValues?: number[]
+): Promise<AppInfo> => {
   const db = await initDatabase();
-  const queriedUsers = await queryForUsers(db);
+  const queriedUsers = await (selectedFacetValues &&
+  selectedFacetValues.length > 0
+    ? queryForUsersWithFacets(db, selectedFacetValues)
+    : queryForUsers(db));
   const users = userQueryResultToUsers(queriedUsers);
-  const facets = userQueryResultToFacets(queriedUsers);
+  const facetsWithoutCount = userQueryResultToFacets(queriedUsers);
+  const facets: FacetWithFacetValueCount[] = await Promise.all(
+    _.map(facetsWithoutCount, async facet => {
+      return {
+        ...facet,
+        values: await Promise.all(
+          _.map(facet.values, async value => {
+            return {
+              id: value.id,
+              name: value.name,
+              count: await queryForFacetNumbers(db, [value.id])
+            };
+          })
+        )
+      };
+    })
+  );
   return { users, facets };
 };

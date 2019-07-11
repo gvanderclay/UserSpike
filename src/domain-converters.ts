@@ -41,8 +41,11 @@ export const userQueryResultToFacets = (
       return {
         name: key,
         values: _.chain(queryResults)
-          .map(result => result.facetValue)
-          .uniq()
+          .map(result => ({
+            name: result.facetValue,
+            id: result.facetValueId
+          }))
+          .uniqBy("id")
           .value()
       };
     }

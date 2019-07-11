@@ -10,5 +10,14 @@ export type User = {
 
 export type Facet = {
   name: string;
-  values: string[];
+  values: FacetValue[];
+};
+
+export type FacetValue = {
+  id: number;
+  name: string;
+};
+
+export type FacetWithFacetValueCount = Facet & {
+  values: (FacetValue & { count: number })[];
 };

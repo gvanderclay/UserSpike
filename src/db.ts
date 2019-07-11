@@ -79,9 +79,10 @@ export function insertFacetValues(
   db: SQLite.SQLiteDatabase,
   facetValues: { gender: string[]; nat: string[] }
 ): Promise<SQLite.Transaction> {
-  return db.transaction(transaction => {
-    _.forEach(facetValues.gender, value => {
-      transaction.executeSql(
+  console.log();
+  return db.transaction(async transaction => {
+    for (const value of facetValues.gender) {
+      await transaction.executeSql(
         `
             INSERT into FacetValues (facet_id, facet_value)
             SELECT facet_id, ?
@@ -89,18 +90,17 @@ export function insertFacetValues(
           `,
         [value]
       );
-    });
-
-    _.forEach(facetValues.nat, value => {
-      transaction.executeSql(
+    }
+    for (const value of facetValues.nat) {
+      await transaction.executeSql(
         `
-          INSERT into FacetValues (facet_id, facet_value)
-          SELECT facet_id, ?
-          FROM Facets as f where f.name = 'nat';
-        `,
+            INSERT into FacetValues (facet_id, facet_value)
+            SELECT facet_id, ?
+            FROM Facets as f where f.name = 'nat';
+          `,
         [value]
       );
-    });
+    }
   });
 }
 
@@ -110,9 +110,6 @@ export async function insertUsers(
 ): Promise<void> {
   await db.transaction(transaction => {
     _.forEach(users, user => {
-      if (!user.id) {
-        console.log("HELLLO", user);
-      }
       transaction.executeSql(
         `
           INSERT into Users (name, user_id)
@@ -152,6 +149,7 @@ export type UserQueryResult = {
   usersName: string;
   userId: string;
   facetValue: string;
+  facetValueId: number;
   facetName: string;
 };
 
@@ -162,7 +160,7 @@ export const queryForUsers = async (
     await db.transaction(async tx => {
       tx.executeSql(
         `
-            SELECT u.name as usersName, u.user_id as userId, fv.facet_value as facetValue, f.name as facetName
+            SELECT u.name as usersName, u.user_id as userId, fv.facet_value as facetValue, f.name as facetName, fv.facet_value_id as facetValueId
             FROM Users u
             JOIN UserFacets uf on u.user_id = uf.user_id
             JOIN FacetValues fv on uf.facet_value_id = fv.facet_value_id
@@ -181,6 +179,81 @@ export const queryForUsers = async (
           rej(error);
         }
       );
+    });
+  });
+};
+
+export const queryForUsersWithFacets = async (
+  db: SQLite.SQLiteDatabase,
+  facetValueIds: number[]
+): Promise<UserQueryResult[]> => {
+  console.log("with facets");
+  return new Promise(async (res, rej) => {
+    await db.transaction(async tx => {
+      tx.executeSql(
+        `
+            SELECT u.name as usersName, u.user_id as userId, fv.facet_value as facetValue, f.name as facetName, fv.facet_value_id as facetValueId
+            FROM Users u
+            JOIN UserFacets uf on u.user_id = uf.user_id
+            JOIN FacetValues fv on uf.facet_value_id = fv.facet_value_id
+            JOIN Facets f on fv.facet_id = f.facet_id
+            AND uf.user_id IN 
+            (SELECT uf2.user_id FROM UserFacets uf2 
+             WHERE uf2.facet_value_id in 
+             (${facetValueIds.map(x => "?").join(",")}));
+           `,
+        facetValueIds,
+        (tx, queryResult) => {
+          const items: UserQueryResult[] = _.map(
+            _.range(queryResult.rows.length),
+            x => queryResult.rows.item(x)
+          );
+          res(items);
+        },
+        (tx, error) => {
+          console.error(error);
+          rej(error);
+        }
+      );
+    });
+  });
+};
+
+export const queryForFacetValues = async (
+  db: SQLite.SQLiteDatabase
+): Promise<any> => {
+  return new Promise(async (res, rej) => {
+    await db.transaction(async tx => {
+      tx.executeSql(
+        `SELECT * FROM FacetValues uf2;`,
+        undefined,
+        (trx, result) => {
+          res(_.map(_.range(result.rows.length), i => result.rows.item(i)));
+        }
+      );
+    });
+  });
+};
+
+export const queryForFacetNumbers = async (
+  db: SQLite.SQLiteDatabase,
+  values: number[]
+): Promise<number> => {
+  return new Promise(async (res, rej) => {
+    await db.transaction(async tx => {
+      const query = `
+          SELECT COUNT(*) as facetValueCount
+          FROM UserFacets uf
+          JOIN Users u on uf.user_id = u.user_id
+          JOIN FacetValues fv on uf.facet_value_id = fv.facet_value_id
+          AND uf.facet_value_id in (${values.map(v => "?").join(",")})
+        `;
+      tx.executeSql(query, values, (trx, result) => {
+        const items = _.map(_.range(result.rows.length), i =>
+          result.rows.item(i)
+        );
+        res(items[0].facetValueCount || 0);
+      });
     });
   });
 };
