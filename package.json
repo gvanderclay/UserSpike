@@ -11,7 +11,7 @@
     "@types/lodash": "^4.14.136",
     "@types/react-native-uuid": "^1.4.0",
     "buffer": "^5.2.1",
-    "knex": "^0.18.3",
+    "knex": "^0.19.5",
     "lodash": "^4.17.11",
     "react": "16.8.6",
     "react-native": "0.60.0",
